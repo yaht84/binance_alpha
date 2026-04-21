@@ -58,30 +58,21 @@ input {
 .brandline {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   color: var(--ink);
   font-size: 0.9rem;
   font-weight: 800;
 }
 
-.brandline > span:last-child {
+.brand-logo {
+  display: block;
+  width: clamp(168px, 18vw, 245px);
+  height: auto;
+}
+
+.brandline > span {
   color: var(--muted);
   font-weight: 700;
-}
-
-.brand-mark {
-  position: relative;
-  width: 18px;
-  height: 18px;
-  transform: rotate(45deg);
-  background: var(--amber);
-}
-
-.brand-mark::after {
-  content: "";
-  position: absolute;
-  inset: 5px;
-  background: var(--bg);
 }
 
 .eyebrow {

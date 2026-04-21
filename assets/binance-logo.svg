@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 260" role="img" aria-label="Binance">
+  <rect width="1024" height="260" fill="transparent"/>
+  <g fill="#f0b90b">
+    <path d="M128 50 172 94 128 138 84 94z"/>
+    <path d="M66 112 104 150 66 188 28 150z"/>
+    <path d="M190 112 228 150 190 188 152 150z"/>
+    <path d="M128 162 172 206 128 250 84 206z"/>
+    <path d="M128 120 158 150 128 180 98 150z"/>
+    <text x="282" y="178" font-family="Arial, Helvetica, sans-serif" font-size="92" font-weight="900" letter-spacing="18">BINANCE</text>
+    <path d="M20 236C178 224 604 224 872 236C623 243 280 244 20 236z" opacity=".62"/>
+  </g>
+</svg>
