@@ -9,8 +9,9 @@
   <body>
     <main class="shell">
       <header class="topbar">
-        <div>
-          <p class="eyebrow">Live Binance Alpha + perps</p>
+        <div class="brand-block">
+          <div class="brandline"><span class="brand-mark"></span><strong>BINANCE</strong><span>Alpha Perp Radar</span></div>
+          <p class="eyebrow">Live Binance Alpha + USDT-M perps</p>
           <h1>PND Signal Radar</h1>
         </div>
         <div class="live-strip">
@@ -58,6 +59,17 @@
         </div>
       </section>
 
+      <section class="legend-panel">
+        <dl>
+          <div><dt>Score</dt><dd>0-100 signal similarity and trigger strength.</dd></div>
+          <div><dt>Vol 1h x</dt><dd>Latest perp quote volume vs recent median 1h window.</dd></div>
+          <div><dt>OI 30d</dt><dd>Open interest value change from daily samples.</dd></div>
+          <div><dt>Max pump</dt><dd>Largest low-to-later-high move in loaded history.</dd></div>
+          <div><dt>Dump</dt><dd>Largest peak-to-later-low drawdown in loaded history.</dd></div>
+          <div><dt>Alpha vol/liq</dt><dd>Binance Alpha 24h volume divided by liquidity.</dd></div>
+        </dl>
+      </section>
+
       <section class="grid">
         <div class="list-panel">
           <div class="panel-head">
@@ -76,7 +88,9 @@
                   <th>4h</th>
                   <th>24h</th>
                   <th>Vol 1h x</th>
-                  <th>OI</th>
+                  <th>OI 30d</th>
+                  <th>Max pump</th>
+                  <th>Dump</th>
                   <th>Alpha vol/liq</th>
                   <th>Liq</th>
                 </tr>
@@ -100,6 +114,9 @@
             <div><span>Price</span><strong id="price">-</strong></div>
             <div><span>Market cap</span><strong id="mcap">-</strong></div>
             <div><span>Liquidity</span><strong id="liq">-</strong></div>
+            <div><span>OI 30d</span><strong id="oi30d">-</strong></div>
+            <div><span>Max pump</span><strong id="maxPump">-</strong></div>
+            <div><span>Dump</span><strong id="maxDump">-</strong></div>
           </div>
           <div id="reasons" class="reasons"></div>
         </aside>

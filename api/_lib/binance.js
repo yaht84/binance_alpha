@@ -254,10 +254,11 @@ async function buildUniverse(config) {
 async function fetchTokenMarket(token, futuresInfo) {
   if (!futuresInfo) return { token, futures: null };
   const symbol = futuresInfo.symbol;
-  const [k15, k1h, oi, topPos, taker, fundingRows] = await Promise.all([
+  const [k15, k1h, oi, oi30d, topPos, taker, fundingRows] = await Promise.all([
     futuresKlines(symbol, "15m", 96).catch(() => []),
     futuresKlines(symbol, "1h", 720).catch(() => []),
     futuresData(symbol, "openInterestHist", "15m", 96),
+    futuresData(symbol, "openInterestHist", "1d", 30),
     futuresData(symbol, "topLongShortPositionRatio", "15m", 96),
     futuresData(symbol, "takerlongshortRatio", "15m", 96),
     funding(symbol, 24),
@@ -273,6 +274,7 @@ async function fetchTokenMarket(token, futuresInfo) {
       k15,
       k1h,
       oi,
+      oi30d,
       topPos,
       taker,
       funding: fundingRows,

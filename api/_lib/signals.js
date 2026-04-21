@@ -74,6 +74,23 @@ function chartPoints(candles) {
   }));
 }
 
+function pumpDumpMetric(candles) {
+  if (!candles.length) return { pumpPct: 0, dumpPct: 0 };
+  let lowBefore = n(candles[0].l) || n(candles[0].c);
+  let highBefore = n(candles[0].h) || n(candles[0].c);
+  let pumpPct = 0;
+  let dumpPct = 0;
+  candles.forEach((candle) => {
+    const high = n(candle.h) || n(candle.c);
+    const low = n(candle.l) || n(candle.c);
+    if (lowBefore > 0 && high > 0) pumpPct = Math.max(pumpPct, pct(change(lowBefore, high)));
+    if (highBefore > 0 && low > 0) dumpPct = Math.min(dumpPct, pct(change(highBefore, low)));
+    if (low > 0) lowBefore = Math.min(lowBefore, low);
+    if (high > 0) highBefore = Math.max(highBefore, high);
+  });
+  return { pumpPct, dumpPct };
+}
+
 function scoreAlpha(alpha, reasons) {
   let score = 0;
   if (!alpha) return score;
@@ -147,10 +164,13 @@ function analyzeToken(record) {
     const vol1hRatio = volumeWindowRatio(k15);
     const nearHigh = high24 > 0 ? pct(last.c / high24 - 1) : 0;
     const oi = metricChange(futures.oi || [], "sumOpenInterestValue");
+    const oi30d = metricChange(futures.oi30d || futures.oi || [], "sumOpenInterestValue");
     const topPos = ratioMetric(futures.topPos || [], "longShortRatio");
     const takerRatio = ratioMetric(futures.taker || [], "buySellRatio");
     const funding = fundingMetric(futures.funding || []);
     const takerBuyShare = qv24 > 0 ? (takerBuy24 / qv24) * 100 : 0;
+    const historyCandles = k1h.length ? k1h : k15;
+    const pumpDump = pumpDumpMetric(historyCandles);
 
     if (vol1hRatio >= 2.2) {
       score += 13;
@@ -202,12 +222,15 @@ function analyzeToken(record) {
       vol1hRatio,
       nearHigh,
       oi,
+      oi30d,
+      pumpPct: pumpDump.pumpPct,
+      dumpPct: pumpDump.dumpPct,
       topPos,
       takerRatio,
       funding,
       takerBuyShare,
     };
-    live.chart = chartPoints(k1h.length ? k1h : k15);
+    live.chart = chartPoints(historyCandles);
   }
 
   live.score = Math.min(100, Math.round(score));

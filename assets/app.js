@@ -264,16 +264,33 @@ function median(values) {
   return clean.length % 2 ? clean[mid] : (clean[mid - 1] + clean[mid]) / 2;
 }
 
-function vol1hRatio(candles) {
-  if (candles.length < 24) return 0;
-  const latest = candles.slice(-4).reduce((sum, candle) => sum + n(candle.qv), 0);
+function vol1hRatio(candles, periods = 4) {
+  if (candles.length < periods * 6) return 0;
+  const latest = candles.slice(-periods).reduce((sum, candle) => sum + n(candle.qv), 0);
   const windows = [];
-  for (let end = 4; end <= candles.length - 4; end += 4) {
-    const value = candles.slice(end - 4, end).reduce((sum, candle) => sum + n(candle.qv), 0);
+  for (let end = periods; end <= candles.length - periods; end += periods) {
+    const value = candles.slice(end - periods, end).reduce((sum, candle) => sum + n(candle.qv), 0);
     if (value > 0) windows.push(value);
   }
   const base = median(windows);
   return base > 0 ? latest / base : 0;
+}
+
+function pumpDumpMetric(candles) {
+  if (!candles.length) return { pumpPct: 0, dumpPct: 0 };
+  let lowBefore = n(candles[0].l) || n(candles[0].c);
+  let highBefore = n(candles[0].h) || n(candles[0].c);
+  let pumpPct = 0;
+  let dumpPct = 0;
+  candles.forEach((candle) => {
+    const high = n(candle.h) || n(candle.c);
+    const low = n(candle.l) || n(candle.c);
+    if (lowBefore > 0 && high > 0) pumpPct = Math.max(pumpPct, change(lowBefore, high) * 100);
+    if (highBefore > 0 && low > 0) dumpPct = Math.min(dumpPct, change(highBefore, low) * 100);
+    if (low > 0) lowBefore = Math.min(lowBefore, low);
+    if (high > 0) highBefore = Math.max(highBefore, high);
+  });
+  return { pumpPct, dumpPct };
 }
 
 function scoreRecord(alpha, futures) {
@@ -342,14 +359,15 @@ async function browserScan() {
     let chart = [];
     if (info) {
       try {
-        const rows = await getJson(`${FUTURES_BASE}/fapi/v1/klines?${q({ symbol: info.symbol, interval: "15m", limit: 96 })}`);
+        const rows = await getJson(`${FUTURES_BASE}/fapi/v1/klines?${q({ symbol: info.symbol, interval: "1h", limit: 720 })}`);
         const candles = rows.map(parseKline);
         const last = candles[candles.length - 1];
-        const ret4h = change(candles[Math.max(0, candles.length - 17)].c, last.c) * 100;
-        const ret24h = change(candles[0].c, last.c) * 100;
+        const ret4h = change(candles[Math.max(0, candles.length - 5)].c, last.c) * 100;
+        const ret24h = change(candles[Math.max(0, candles.length - 25)].c, last.c) * 100;
+        const pumpDump = pumpDumpMetric(candles);
         let oi = { changePct: 0 };
         try {
-          const oiRows = await getJson(`${FUTURES_BASE}/futures/data/openInterestHist?${q({ symbol: info.symbol, period: "15m", limit: 96 })}`);
+          const oiRows = await getJson(`${FUTURES_BASE}/futures/data/openInterestHist?${q({ symbol: info.symbol, period: "1d", limit: 30 })}`);
           const values = oiRows.map((row) => n(row.sumOpenInterestValue)).filter((value) => value > 0);
           oi = { changePct: values.length > 1 ? change(values[0], values[values.length - 1]) * 100 : 0 };
         } catch {
@@ -361,8 +379,11 @@ async function browserScan() {
           price: last.c,
           ret4h,
           ret24h,
-          vol1hRatio: vol1hRatio(candles),
+          vol1hRatio: vol1hRatio(candles, 1),
           oi,
+          oi30d: oi,
+          pumpPct: pumpDump.pumpPct,
+          dumpPct: pumpDump.dumpPct,
         };
         chart = candles.map((candle) => ({ t: candle.t, c: candle.c, h: candle.h, l: candle.l, qv: candle.qv }));
       } catch {
@@ -433,7 +454,9 @@ function renderTable() {
         <td class="${trend(f.ret4h)}">${pct(f.ret4h)}</td>
         <td class="${trend(f.ret24h)}">${pct(f.ret24h)}</td>
         <td>${x(f.vol1hRatio)}</td>
-        <td class="${trend(f.oi && f.oi.changePct)}">${pct(f.oi && f.oi.changePct)}</td>
+        <td class="${trend((f.oi30d || f.oi) && (f.oi30d || f.oi).changePct)}">${pct((f.oi30d || f.oi) && (f.oi30d || f.oi).changePct)}</td>
+        <td class="${trend(f.pumpPct)}">${pct(f.pumpPct)}</td>
+        <td class="${trend(f.dumpPct)}">${pct(f.dumpPct)}</td>
         <td>${x(a.volumeLiquidity)}</td>
         <td>${money(a.liquidity)}</td>
       </tr>`;
@@ -492,6 +515,9 @@ function renderDetail() {
   $("price").textContent = f.price ? String(f.price) : a.price ? String(a.price) : "-";
   $("mcap").textContent = money(a.marketCap);
   $("liq").textContent = money(a.liquidity);
+  $("oi30d").textContent = pct((f.oi30d || f.oi) && (f.oi30d || f.oi).changePct);
+  $("maxPump").textContent = pct(f.pumpPct);
+  $("maxDump").textContent = pct(f.dumpPct);
   $("reasons").innerHTML = (item.reasons.length ? item.reasons : ["no active trigger"])
     .map((reason) => `<span class="chip">${reason}</span>`)
     .join("");
@@ -508,7 +534,14 @@ async function loadChartHistory(item) {
     const full = rows.map(parseKline).map((candle) => ({ t: candle.t, c: candle.c, h: candle.h, l: candle.l, qv: candle.qv }));
     if (full.length > 1) {
       item.chartFull = full;
-      if (state.selected === item.token) drawChart(full);
+      const pumpDump = pumpDumpMetric(full);
+      item.futures.pumpPct = pumpDump.pumpPct;
+      item.futures.dumpPct = pumpDump.dumpPct;
+      if (state.selected === item.token) {
+        $("maxPump").textContent = pct(pumpDump.pumpPct);
+        $("maxDump").textContent = pct(pumpDump.dumpPct);
+        drawChart(full);
+      }
     }
   } catch {
     item.chartFull = item.chart || [];
@@ -528,11 +561,11 @@ function drawChart(points) {
   const w = rect.width;
   const h = rect.height;
   ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = "#fffaf0";
+  ctx.fillStyle = "#0f1319";
   ctx.fillRect(0, 0, w, h);
 
   if (!points.length) {
-    ctx.fillStyle = "#68707d";
+    ctx.fillStyle = "#848e9c";
     ctx.font = "14px Inter, sans-serif";
     ctx.fillText("No futures chart", 18, 28);
     return;
@@ -549,7 +582,7 @@ function drawChart(points) {
   const xFor = (i) => pad.l + (i / Math.max(points.length - 1, 1)) * innerW;
   const yFor = (price) => pad.t + (1 - (price - minP) / Math.max(maxP - minP, 1e-12)) * innerH * 0.72;
 
-  ctx.strokeStyle = "#d8d0c0";
+  ctx.strokeStyle = "#2b3139";
   ctx.lineWidth = 1;
   for (let i = 0; i < 4; i += 1) {
     const y = pad.t + (innerH * i) / 4;
@@ -559,7 +592,7 @@ function drawChart(points) {
     ctx.stroke();
   }
 
-  ctx.fillStyle = "rgba(40, 103, 178, 0.16)";
+  ctx.fillStyle = "rgba(240, 185, 11, 0.18)";
   points.forEach((p, i) => {
     const barW = Math.max(1, innerW / points.length - 1);
     const barH = (n(p.qv) / maxV) * innerH * 0.22;
@@ -567,9 +600,9 @@ function drawChart(points) {
   });
 
   const grad = ctx.createLinearGradient(0, 0, w, 0);
-  grad.addColorStop(0, "#2867b2");
-  grad.addColorStop(0.6, "#178263");
-  grad.addColorStop(1, "#c44940");
+  grad.addColorStop(0, "#f0b90b");
+  grad.addColorStop(0.6, "#0ecb81");
+  grad.addColorStop(1, "#f6465d");
   ctx.strokeStyle = grad;
   ctx.lineWidth = 2.4;
   ctx.beginPath();
@@ -581,7 +614,7 @@ function drawChart(points) {
   });
   ctx.stroke();
 
-  ctx.fillStyle = "#68707d";
+  ctx.fillStyle = "#848e9c";
   ctx.font = "12px Inter, sans-serif";
   ctx.fillText(`high ${maxP.toPrecision(4)}`, 8, pad.t + 8);
   ctx.fillText(`low ${minP.toPrecision(4)}`, 8, pad.t + innerH * 0.72);
