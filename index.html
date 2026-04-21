@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Binance Alpha Live Radar</title>
-    <link rel="stylesheet" href="assets/styles.css?v=20260421d" />
+    <link rel="stylesheet" href="assets/styles.css?v=20260421e" />
   </head>
   <body>
     <main class="shell">
@@ -65,7 +65,7 @@
       <details class="legend-panel">
         <summary>Metric legend</summary>
         <dl>
-          <div><dt>Score</dt><dd>0-100 signal similarity and trigger strength.</dd></div>
+          <div><dt>Score</dt><dd>0-100 PND-cohort similarity; penalizes post-pump footprints.</dd></div>
           <div><dt>Vol 1h x</dt><dd>Latest perp quote volume vs recent median 1h window.</dd></div>
           <div><dt>OI 30d</dt><dd>Open interest value change from daily samples.</dd></div>
           <div><dt>Max pump</dt><dd>Largest low-to-later-high move in loaded history.</dd></div>
@@ -122,6 +122,7 @@
             <div><span>OI 30d</span><strong id="oi30d">-</strong></div>
             <div><span>Max pump</span><strong id="maxPump">-</strong></div>
             <div><span>Dump</span><strong id="maxDump">-</strong></div>
+            <div><span>Pattern</span><strong id="pattern">-</strong></div>
           </div>
           <div id="reasons" class="reasons"></div>
         </aside>
@@ -139,6 +140,6 @@
         </div>
       </section>
     </main>
-    <script src="assets/app.js?v=20260421d"></script>
+    <script src="assets/app.js?v=20260421e"></script>
   </body>
 </html>

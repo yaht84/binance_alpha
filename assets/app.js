@@ -304,50 +304,114 @@ function chartIntervalFor(item) {
   return { interval: "1w", startTime: onboardDate, label: "full history - 1w candles" };
 }
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function addScore(box, points, reason) {
+  if (points <= 0) return;
+  box.score += points;
+  box.reasons.push(reason);
+}
+
+function bandScore(value, low, high, maxPoints) {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  if (value >= low && value <= high) return maxPoints;
+  const mid = (low + high) / 2;
+  const width = Math.max(high - low, 1e-9);
+  return clamp(maxPoints * (1 - Math.abs(value - mid) / width), 0, maxPoints * 0.65);
+}
+
+function logBandScore(value, low, high, maxPoints) {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  if (value >= low && value <= high) return maxPoints;
+  const lValue = Math.log(value);
+  const lLow = Math.log(low);
+  const lHigh = Math.log(high);
+  const lMid = (lLow + lHigh) / 2;
+  const width = Math.max(lHigh - lLow, 1e-9);
+  return clamp(maxPoints * (1 - Math.abs(lValue - lMid) / width), 0, maxPoints * 0.65);
+}
+
+function windowRangePct(candles, limit) {
+  const sample = candles.slice(-limit);
+  const highs = sample.map((candle) => n(candle.h)).filter((value) => value > 0);
+  const lows = sample.map((candle) => n(candle.l)).filter((value) => value > 0);
+  if (!highs.length || !lows.length) return 0;
+  return change(Math.min(...lows), Math.max(...highs)) * 100;
+}
+
+function classifyPattern(metrics, cohort) {
+  if (cohort === "pumped") return "training cohort";
+  if (metrics.pumpPct >= 350 && metrics.dumpPct <= -40) return "spent pnd";
+  if (metrics.pumpPct >= 160 && metrics.dumpPct <= -45) return "post-pump risk";
+  if (metrics.pumpPct >= 250 && metrics.drawdownFromHigh <= -30) return "post-pump risk";
+  if (metrics.ret24h >= 60 || metrics.pumpPct >= 180) return "overextended";
+  if (metrics.ret24h >= 10 || metrics.oi30d.changePct >= 35 || metrics.vol1hRatio >= 2.2) return "active setup";
+  return "watch setup";
+}
+
 function scoreRecord(alpha, futures) {
   const reasons = [];
-  let score = 0;
+  const scoring = { score: 0, reasons };
   if (alpha) {
     if (alpha.volumeLiquidity !== null && alpha.volumeLiquidity >= 1) {
-      score += 12;
-      reasons.push("alpha volume/liquidity above 1x");
+      addScore(scoring, 5, "alpha volume/liquidity above 1x");
     }
     if (alpha.volumeLiquidity !== null && alpha.volumeLiquidity >= 3) {
-      score += 14;
-      reasons.push("alpha volume/liquidity above 3x");
+      addScore(scoring, 5, "alpha volume/liquidity above 3x");
     }
     if (alpha.liquidity > 0 && alpha.liquidity < 1_000_000) {
-      score += 10;
-      reasons.push("thin alpha liquidity");
+      addScore(scoring, 4, "thin alpha liquidity");
     }
     if (alpha.marketCap > 0 && alpha.marketCap < 80_000_000) {
-      score += 9;
-      reasons.push("low market cap");
+      addScore(scoring, 3, "low market cap");
     }
     if (alpha.fdvMcap !== null && alpha.fdvMcap >= 3) {
-      score += 6;
-      reasons.push("high FDV/MCAP");
+      addScore(scoring, 2, "high FDV/MCAP");
     }
   }
   if (futures) {
     if (futures.vol1hRatio >= 2.2) {
-      score += 13;
-      reasons.push("1h futures volume breakout");
+      addScore(scoring, futures.vol1hRatio >= 7 ? 8 : 6, "1h futures volume breakout");
     }
-    if (futures.ret4h >= 8 && futures.ret4h <= 55) {
-      score += 9;
-      reasons.push("early 4h momentum");
+    if (futures.vol24Ratio >= 2.5) {
+      addScore(scoring, futures.vol24Ratio >= 7 ? 8 : 5, "24h futures volume resembles pump cohort");
     }
-    if (futures.ret24h >= 15 && futures.ret24h <= 95) {
-      score += 9;
-      reasons.push("24h momentum before vertical stage");
+    if (futures.ret4h >= 4 && futures.ret4h <= 35) {
+      addScore(scoring, 5, "early 4h momentum");
     }
-    if (futures.oi && futures.oi.changePct >= 35) {
-      score += 12;
-      reasons.push("open interest expanding fast");
+    if (futures.ret24h >= 8 && futures.ret24h <= 65) {
+      addScore(scoring, 5, "24h momentum before vertical stage");
+    }
+    if (futures.oi && futures.oi.changePct >= 25) {
+      addScore(scoring, 5, "short-window open interest expanding");
+    }
+    if (futures.oi30d && futures.oi30d.changePct >= 25) {
+      addScore(scoring, futures.oi30d.changePct >= 80 ? 8 : 5, "30d open interest expansion");
+    }
+    addScore(scoring, logBandScore(alpha && alpha.volumeLiquidity, 1.4, 6.5, 6), "alpha volume/liquidity matches PND cohort");
+    addScore(scoring, logBandScore(alpha && alpha.liquidity, 25_000, 1_200_000, 4), "thin liquidity matches PND cohort");
+    addScore(scoring, logBandScore(alpha && alpha.marketCap, 3_000_000, 120_000_000, 4), "market cap in PND cohort band");
+    addScore(scoring, bandScore(futures.range7d, 45, 260, 5), "7d range resembles pre-pump volatility");
+    addScore(scoring, logBandScore(futures.vol24Ratio, 3, 12, 6), "24h volume spike near cohort fingerprint");
+    addScore(scoring, bandScore(futures.ret72h, 10, 160, 4), "multi-day momentum resembles setup phase");
+    const pattern = classifyPattern(futures, futures.cohort);
+    futures.pattern = pattern;
+    if (futures.cohort !== "pumped") {
+      if (pattern === "spent pnd") {
+        scoring.score -= 45;
+        reasons.push("penalty: already shows full pump-and-dump footprint");
+      } else if (pattern === "post-pump risk") {
+        scoring.score -= 36;
+        reasons.push("penalty: looks post-pump, not pre-pump");
+      } else if (pattern === "overextended") {
+        scoring.score -= 22;
+        reasons.push("penalty: move is already overextended");
+      }
     }
   }
-  return { score: Math.min(100, Math.round(score)), reasons };
+  return { score: clamp(Math.round(scoring.score), 0, 100), reasons };
 }
 
 async function browserScan() {
@@ -375,7 +439,13 @@ async function browserScan() {
         const last = candles[candles.length - 1];
         const ret4h = change(candles[Math.max(0, candles.length - 5)].c, last.c) * 100;
         const ret24h = change(candles[Math.max(0, candles.length - 25)].c, last.c) * 100;
+        const ret72h = change(candles[Math.max(0, candles.length - 73)].c, last.c) * 100;
+        const ret7d = change(candles[Math.max(0, candles.length - 169)].c, last.c) * 100;
+        const range7d = windowRangePct(candles, 168);
+        const vol24Ratio = vol1hRatio(candles, 24);
         const pumpDump = pumpDumpMetric(candles);
+        const historyHigh = Math.max(...candles.map((candle) => n(candle.h)).filter((value) => value > 0), last.c);
+        const drawdownFromHigh = historyHigh > 0 ? change(historyHigh, last.c) * 100 : 0;
         let oi = { changePct: 0 };
         try {
           const oiRows = await getJson(`${FUTURES_BASE}/futures/data/openInterestHist?${q({ symbol: info.symbol, period: "1d", limit: 30 })}`);
@@ -391,11 +461,17 @@ async function browserScan() {
           price: last.c,
           ret4h,
           ret24h,
+          ret72h,
+          ret7d,
+          range7d,
           vol1hRatio: vol1hRatio(candles, 1),
+          vol24Ratio,
           oi,
           oi30d: oi,
           pumpPct: pumpDump.pumpPct,
           dumpPct: pumpDump.dumpPct,
+          drawdownFromHigh,
+          cohort: SEED_PUMPED.includes(token) ? "pumped" : "candidate",
         };
         chart = candles.map((candle) => ({ t: candle.t, c: candle.c, h: candle.h, l: candle.l, qv: candle.qv }));
       } catch {
@@ -461,7 +537,7 @@ function renderTable() {
       const a = item.alpha || {};
       const cls = scoreClass(item.score);
       return `<tr data-token="${item.token}" class="${item.token === state.selected ? "selected" : ""} ${item.signal ? "signal-row" : ""}">
-        <td><div class="token"><strong>${item.token}</strong><span>${f.symbol} - ${a.alphaId || "no alpha"}</span></div></td>
+        <td><div class="token"><strong>${item.token}</strong><span>${f.symbol} - ${f.pattern || item.cohort} - ${a.alphaId || "no alpha"}</span></div></td>
         <td><div class="score-cell"><strong>${item.score}</strong><span class="track"><span class="fill ${cls}" style="width:${item.score}%"></span></span></div></td>
         <td class="${trend(f.ret4h)}">${pct(f.ret4h)}</td>
         <td class="${trend(f.ret24h)}">${pct(f.ret24h)}</td>
@@ -530,6 +606,7 @@ function renderDetail() {
   $("oi30d").textContent = pct((f.oi30d || f.oi) && (f.oi30d || f.oi).changePct);
   $("maxPump").textContent = pct(f.pumpPct);
   $("maxDump").textContent = pct(f.dumpPct);
+  $("pattern").textContent = f.pattern || item.cohort;
   $("chartMeta").textContent = item.chartLabel || "30d preview - loading full history";
   $("reasons").innerHTML = (item.reasons.length ? item.reasons : ["no active trigger"])
     .map((reason) => `<span class="chip">${reason}</span>`)

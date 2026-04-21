@@ -34,7 +34,7 @@ input {
 }
 
 .shell {
-  width: min(1500px, calc(100% - 32px));
+  width: min(1840px, calc(100% - 48px));
   margin: 0 auto;
   padding: 18px 0 38px;
 }
@@ -299,7 +299,7 @@ h2 {
 
 .grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.18fr) minmax(370px, 0.82fr);
+  grid-template-columns: minmax(1120px, 1.55fr) minmax(500px, 0.7fr);
   gap: 12px;
   align-items: start;
 }
@@ -337,13 +337,14 @@ h2 {
 
 table {
   width: 100%;
-  min-width: 1060px;
+  min-width: 1110px;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 th,
 td {
-  padding: 12px 10px;
+  padding: 11px 8px;
   border-bottom: 1px solid var(--line);
   text-align: right;
   white-space: nowrap;
@@ -362,6 +363,41 @@ th {
   color: var(--muted);
   background: #11151b;
   font-size: 0.78rem;
+}
+
+th:nth-child(1),
+td:nth-child(1) {
+  width: 250px;
+}
+
+th:nth-child(2),
+td:nth-child(2) {
+  width: 138px;
+}
+
+th:nth-child(3),
+td:nth-child(3),
+th:nth-child(4),
+td:nth-child(4),
+th:nth-child(5),
+td:nth-child(5),
+th:nth-child(6),
+td:nth-child(6),
+th:nth-child(7),
+td:nth-child(7),
+th:nth-child(8),
+td:nth-child(8) {
+  width: 86px;
+}
+
+th:nth-child(9),
+td:nth-child(9) {
+  width: 112px;
+}
+
+th:nth-child(10),
+td:nth-child(10) {
+  width: 96px;
 }
 
 tbody tr {
@@ -396,7 +432,7 @@ tbody tr.selected {
 
 .score-cell {
   display: grid;
-  grid-template-columns: 40px minmax(72px, 1fr);
+  grid-template-columns: 34px minmax(62px, 1fr);
   gap: 8px;
   align-items: center;
 }
@@ -581,7 +617,13 @@ tbody tr.selected {
   white-space: nowrap;
 }
 
-@media (max-width: 1050px) {
+@media (max-width: 1680px) {
+  .grid {
+    grid-template-columns: minmax(1040px, 1.45fr) minmax(440px, 0.65fr);
+  }
+}
+
+@media (max-width: 1530px) {
   .grid {
     grid-template-columns: 1fr;
   }

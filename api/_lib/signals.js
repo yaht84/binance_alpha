@@ -91,39 +91,98 @@ function pumpDumpMetric(candles) {
   return { pumpPct, dumpPct };
 }
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function addScore(box, points, reason) {
+  if (points <= 0) return;
+  box.score += points;
+  box.reasons.push(reason);
+}
+
+function bandScore(value, low, high, maxPoints) {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  if (value >= low && value <= high) return maxPoints;
+  const mid = (low + high) / 2;
+  const width = Math.max(high - low, 1e-9);
+  return clamp(maxPoints * (1 - Math.abs(value - mid) / width), 0, maxPoints * 0.65);
+}
+
+function logBandScore(value, low, high, maxPoints) {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  if (value >= low && value <= high) return maxPoints;
+  const lValue = Math.log(value);
+  const lLow = Math.log(low);
+  const lHigh = Math.log(high);
+  const lMid = (lLow + lHigh) / 2;
+  const width = Math.max(lHigh - lLow, 1e-9);
+  return clamp(maxPoints * (1 - Math.abs(lValue - lMid) / width), 0, maxPoints * 0.65);
+}
+
+function windowRangePct(candles, limit) {
+  const sample = candles.slice(-limit);
+  const highs = sample.map((candle) => n(candle.h)).filter((value) => value > 0);
+  const lows = sample.map((candle) => n(candle.l)).filter((value) => value > 0);
+  if (!highs.length || !lows.length) return 0;
+  return pct(change(Math.min(...lows), Math.max(...highs)));
+}
+
+function volumeRatio(candles, periods) {
+  if (candles.length < periods * 4) return 0;
+  const latest = candles.slice(-periods).reduce((sum, candle) => sum + n(candle.qv), 0);
+  const windows = [];
+  for (let end = periods; end <= candles.length - periods; end += periods) {
+    const value = candles.slice(end - periods, end).reduce((sum, candle) => sum + n(candle.qv), 0);
+    if (value > 0) windows.push(value);
+  }
+  const base = median(windows);
+  return base > 0 ? latest / base : 0;
+}
+
+function classifyPattern(metrics, cohort) {
+  if (cohort === "pumped") return "training cohort";
+  if (metrics.pumpPct >= 350 && metrics.dumpPct <= -40) return "spent pnd";
+  if (metrics.pumpPct >= 160 && metrics.dumpPct <= -45) return "post-pump risk";
+  if (metrics.pumpPct >= 250 && metrics.drawdownFromHigh <= -30) return "post-pump risk";
+  if (metrics.ret24h >= 60 || metrics.pumpPct >= 180) return "overextended";
+  if (metrics.ret24h >= 10 || metrics.oi30d.changePct >= 35 || metrics.vol1hRatio >= 2.2) return "active setup";
+  return "watch setup";
+}
+
 function scoreAlpha(alpha, reasons) {
   let score = 0;
   if (!alpha) return score;
   if (alpha.volumeLiquidity !== null && alpha.volumeLiquidity >= 1) {
-    score += 12;
+    score += 5;
     reasons.push("alpha volume/liquidity above 1x");
   }
   if (alpha.volumeLiquidity !== null && alpha.volumeLiquidity >= 3) {
-    score += 14;
+    score += 5;
     reasons.push("alpha volume/liquidity above 3x");
   }
   if (alpha.liquidity > 0 && alpha.liquidity < 1_000_000) {
-    score += 10;
+    score += 4;
     reasons.push("thin alpha liquidity");
   }
   if (alpha.marketCap > 0 && alpha.marketCap < 80_000_000) {
-    score += 9;
+    score += 3;
     reasons.push("low market cap");
   }
   if (alpha.fdvMcap !== null && alpha.fdvMcap >= 3) {
-    score += 6;
+    score += 2;
     reasons.push("high FDV/MCAP");
   }
   if (alpha.holders !== null && alpha.holders < 30_000) {
-    score += 5;
+    score += 2;
     reasons.push("small holder base");
   }
   if (Math.abs(alpha.change24h) >= 12) {
-    score += 6;
+    score += 2;
     reasons.push("large alpha 24h move");
   }
   if (alpha.hotTag) {
-    score += 5;
+    score += 2;
     reasons.push("alpha hot tag");
   }
   return score;
@@ -160,8 +219,11 @@ function analyzeToken(record) {
     const ret4h = pct(change(firstClose(k15, 16), last.c));
     const ret24h = pct(change(firstClose(k15, 95), last.c));
     const ret72h = k1h.length ? pct(change(firstClose(k1h, 72), k1h[k1h.length - 1].c)) : 0;
+    const ret7d = k1h.length ? pct(change(firstClose(k1h, 168), k1h[k1h.length - 1].c)) : 0;
     const range24 = pct(change(low24, high24));
     const vol1hRatio = volumeWindowRatio(k15);
+    const vol24Ratio = k1h.length ? volumeRatio(k1h, 24) : 0;
+    const range7d = k1h.length ? windowRangePct(k1h, 168) : range24;
     const nearHigh = high24 > 0 ? pct(last.c / high24 - 1) : 0;
     const oi = metricChange(futures.oi || [], "sumOpenInterestValue");
     const oi30d = metricChange(futures.oi30d || futures.oi || [], "sumOpenInterestValue");
@@ -171,43 +233,84 @@ function analyzeToken(record) {
     const takerBuyShare = qv24 > 0 ? (takerBuy24 / qv24) * 100 : 0;
     const historyCandles = k1h.length ? k1h : k15;
     const pumpDump = pumpDumpMetric(historyCandles);
+    const historyHigh = Math.max(...historyCandles.map((candle) => n(candle.h)).filter((value) => value > 0), last.c);
+    const drawdownFromHigh = historyHigh > 0 ? pct(last.c / historyHigh - 1) : 0;
+    const metrics = {
+      ret4h,
+      ret24h,
+      ret72h,
+      ret7d,
+      range24,
+      range7d,
+      vol1hRatio,
+      vol24Ratio,
+      nearHigh,
+      oi,
+      oi30d,
+      topPos,
+      takerRatio,
+      takerBuyShare,
+      funding,
+      pumpPct: pumpDump.pumpPct,
+      dumpPct: pumpDump.dumpPct,
+      drawdownFromHigh,
+    };
+    const scoring = { score, reasons };
 
     if (vol1hRatio >= 2.2) {
-      score += 13;
-      reasons.push("1h futures volume breakout");
+      addScore(scoring, vol1hRatio >= 7 ? 8 : 6, "1h futures volume breakout");
     }
-    if (ret4h >= 8 && ret4h <= 55) {
-      score += 9;
-      reasons.push("early 4h momentum");
+    if (vol24Ratio >= 2.5) {
+      addScore(scoring, vol24Ratio >= 7 ? 8 : 5, "24h futures volume resembles pump cohort");
     }
-    if (ret24h >= 15 && ret24h <= 95) {
-      score += 9;
-      reasons.push("24h momentum before vertical stage");
+    if (ret4h >= 4 && ret4h <= 35) {
+      addScore(scoring, 5, "early 4h momentum");
+    }
+    if (ret24h >= 8 && ret24h <= 65) {
+      addScore(scoring, 5, "24h momentum before vertical stage");
     }
     if (nearHigh > -6 && range24 >= 18) {
-      score += 8;
-      reasons.push("price pressing 24h high");
+      addScore(scoring, 4, "price pressing 24h high");
     }
-    if (oi.changePct >= 35) {
-      score += 12;
-      reasons.push("open interest expanding fast");
+    if (oi.changePct >= 25) {
+      addScore(scoring, 5, "short-window open interest expanding");
+    }
+    if (oi30d.changePct >= 25) {
+      addScore(scoring, oi30d.changePct >= 80 ? 8 : 5, "30d open interest expansion");
     }
     if (topPos.last >= 2) {
-      score += 6;
-      reasons.push("top traders crowded long");
+      addScore(scoring, 4, "top traders crowded long");
     }
     if (takerRatio.last >= 1.25) {
-      score += 6;
-      reasons.push("aggressive taker buy flow");
+      addScore(scoring, 4, "aggressive taker buy flow");
     }
     if (takerBuyShare >= 56) {
-      score += 5;
-      reasons.push("taker buy share above 56%");
+      addScore(scoring, 3, "taker buy share above 56%");
     }
-    if (funding.lastPct > 0.08) {
-      score += 4;
-      reasons.push("funding turning hot");
+    if (funding.lastPct > 0.04 && funding.lastPct < 0.22) {
+      addScore(scoring, 3, "funding turning hot but not extreme");
     }
+    addScore(scoring, logBandScore(alpha && alpha.volumeLiquidity, 1.4, 6.5, 6), "alpha volume/liquidity matches PND cohort");
+    addScore(scoring, logBandScore(alpha && alpha.liquidity, 25_000, 1_200_000, 4), "thin liquidity matches PND cohort");
+    addScore(scoring, logBandScore(alpha && alpha.marketCap, 3_000_000, 120_000_000, 4), "market cap in PND cohort band");
+    addScore(scoring, bandScore(range7d, 45, 260, 5), "7d range resembles pre-pump volatility");
+    addScore(scoring, logBandScore(vol24Ratio, 3, 12, 6), "24h volume spike near cohort fingerprint");
+    addScore(scoring, bandScore(ret72h, 10, 160, 4), "multi-day momentum resembles setup phase");
+
+    const pattern = classifyPattern(metrics, record.cohort);
+    if (record.cohort !== "pumped") {
+      if (pattern === "spent pnd") {
+        scoring.score -= 45;
+        reasons.push("penalty: already shows full pump-and-dump footprint");
+      } else if (pattern === "post-pump risk") {
+        scoring.score -= 36;
+        reasons.push("penalty: looks post-pump, not pre-pump");
+      } else if (pattern === "overextended") {
+        scoring.score -= 22;
+        reasons.push("penalty: move is already overextended");
+      }
+    }
+    score = scoring.score;
 
     live.futures = {
       symbol: futures.symbol,
@@ -218,14 +321,19 @@ function analyzeToken(record) {
       ret4h,
       ret24h,
       ret72h,
+      ret7d,
       range24,
+      range7d,
       qv24,
       vol1hRatio,
+      vol24Ratio,
       nearHigh,
       oi,
       oi30d,
       pumpPct: pumpDump.pumpPct,
       dumpPct: pumpDump.dumpPct,
+      drawdownFromHigh,
+      pattern,
       topPos,
       takerRatio,
       funding,
@@ -234,7 +342,7 @@ function analyzeToken(record) {
     live.chart = chartPoints(historyCandles);
   }
 
-  live.score = Math.min(100, Math.round(score));
+  live.score = clamp(Math.round(score), 0, 100);
   live.reasons = [...new Set(reasons)].slice(0, 8);
   live.signal = live.score >= record.threshold;
   live.signalKey = `${live.token}:${Math.floor(now / (60 * 60 * 1000))}:${live.reasons.slice(0, 3).join("|")}`;
