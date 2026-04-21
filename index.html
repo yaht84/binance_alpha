@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Binance Alpha Live Radar</title>
-    <link rel="stylesheet" href="assets/styles.css?v=20260421f" />
+    <link rel="stylesheet" href="assets/styles.css?v=20260421g" />
   </head>
   <body>
     <main class="shell">
@@ -145,7 +145,69 @@
           <ol id="rankList"></ol>
         </div>
       </section>
+
+      <section class="info-panel" aria-labelledby="scoreInfoTitle">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Info</p>
+            <h2 id="scoreInfoTitle">Jak liczony jest score</h2>
+          </div>
+          <span>0-100</span>
+        </div>
+        <div class="info-grid">
+          <div>
+            <h3>Baza</h3>
+            <p>
+              Score mierzy podobienstwo aktualnego setupu do historycznej kohorty PND:
+              RIVER, SIREN, RAVE, SOON, POWER, MYX i ARIA. Najpierw sumowane sa punkty
+              za Alpha + perp, potem odejmowane sa kary za tokeny, ktore wygladaja juz
+              jak po ruchu.
+            </p>
+          </div>
+          <div>
+            <h3>Alpha</h3>
+            <p>
+              Punkty ida za wysoki wolumen do plynnosci, cienka plynnosc, niski market cap,
+              wysoki FDV/MCAP, mala baze holderow, mocny ruch 24h albo hot tag. Sama warstwa
+              Alpha zwykle daje fundament ryzyka, ale bez potwierdzenia na perpie nie powinna
+              dominowac rankingu.
+            </p>
+          </div>
+          <div>
+            <h3>Perp / TA</h3>
+            <p>
+              Najwiecej waza wybicia wolumenu 1h i 24h, momentum 4h/24h/72h, range 7d,
+              ekspansja OI, cena blisko 24h high, agresywny taker buy, long crowding i funding.
+              Jesli dana metryka nie jest dostepna w zrodle live, dostaje 0 zamiast zgadywania.
+            </p>
+          </div>
+          <div>
+            <h3>Fingerprint PND</h3>
+            <p>
+              Dodatkowe punkty wpadaja, gdy token trafia w pasma podobne do kohorty:
+              Alpha vol/liq 1.4-6.5x, plynnosc 25K-1.2M USD, market cap 3-120M USD,
+              range 7d 45-260%, spike wolumenu 24h 3-12x i momentum 72h 10-160%.
+            </p>
+          </div>
+          <div>
+            <h3>Kary</h3>
+            <p>
+              Algorytm odejmuje punkty, jesli token wyglada na juz rozegrany:
+              spent PND -45, post-pump risk -36, overextended -22. To ma odfiltrowac
+              tokeny, ktore mialy juz pionowy ruch i mocny dump.
+            </p>
+          </div>
+          <div>
+            <h3>Progi</h3>
+            <p>
+              75+ to aktywny signal, 70-74 to high-risk candidate, 50-69 to watch zone,
+              ponizej 50 to slabe podobienstwo. Score nie jest predykcja ceny ani porada
+              finansowa, tylko ranking podobienstwa do obserwowanego schematu.
+            </p>
+          </div>
+        </div>
+      </section>
     </main>
-    <script src="assets/app.js?v=20260421f"></script>
+    <script src="assets/app.js?v=20260421g"></script>
   </body>
 </html>
