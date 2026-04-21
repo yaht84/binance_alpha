@@ -65,7 +65,7 @@ function fundingMetric(rows) {
 }
 
 function chartPoints(candles) {
-  return candles.slice(-96).map((candle) => ({
+  return candles.map((candle) => ({
     t: candle.t,
     c: candle.c,
     h: candle.h,
@@ -207,7 +207,7 @@ function analyzeToken(record) {
       funding,
       takerBuyShare,
     };
-    live.chart = chartPoints(k15);
+    live.chart = chartPoints(k1h.length ? k1h : k15);
   }
 
   live.score = Math.min(100, Math.round(score));

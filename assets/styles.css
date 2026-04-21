@@ -121,7 +121,8 @@ h2 {
 
 .stats article,
 .list-panel,
-.detail-panel {
+.detail-panel,
+.rank-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
@@ -275,7 +276,18 @@ th {
 }
 
 tbody tr {
+  counter-increment: table-rank;
   cursor: pointer;
+}
+
+tbody {
+  counter-reset: table-rank;
+}
+
+.token strong::before {
+  content: "#" counter(table-rank) " ";
+  color: var(--muted);
+  font-weight: 760;
 }
 
 tbody tr:hover,
@@ -396,9 +408,63 @@ tbody tr.selected {
   background: #fbf7ed;
 }
 
+.lower-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.rank-panel {
+  overflow: hidden;
+}
+
+.rank-panel ol {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 0 15px 15px 38px;
+}
+
+.rank-panel li {
+  min-height: 82px;
+  padding: 10px 12px 10px 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.rank-panel li.selected {
+  background: #f2ede3;
+}
+
+.rank-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.rank-line .score {
+  min-height: 26px;
+  min-width: 38px;
+  font-size: 0.75rem;
+}
+
+.rank-panel p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
 @media (max-width: 1050px) {
   .grid {
     grid-template-columns: 1fr;
+  }
+
+  .rank-panel ol {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -431,5 +497,9 @@ tbody tr.selected {
 
   .segmented button:last-child {
     border-bottom: 0;
+  }
+
+  .rank-panel ol {
+    grid-template-columns: 1fr;
   }
 }

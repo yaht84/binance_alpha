@@ -21,8 +21,9 @@ async function mapLimit(items, limit, worker) {
 async function runScan(options = {}) {
   const config = { ...getConfig(), ...options };
   const universe = await buildUniverse(config);
-  const tokenSet = new Set(universe.tokens);
-  const rows = universe.tokens.map((token) => ({
+  const rows = universe.tokens
+    .filter((token) => universe.futuresMap.has(token))
+    .map((token) => ({
     token,
     cohort: config.pumpedTokens.includes(token) ? "pumped" : "candidate",
     alpha: universe.alphaMap.get(token) || null,
@@ -50,7 +51,7 @@ async function runScan(options = {}) {
       alertScoreThreshold: config.alertScoreThreshold,
     },
     coverage: {
-      total: tokenSet.size,
+      total: rows.length,
       withFutures: rows.filter((row) => row.futuresInfo).length,
       withAlpha: rows.filter((row) => row.alpha).length,
     },

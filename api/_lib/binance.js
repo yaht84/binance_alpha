@@ -167,13 +167,14 @@ function chooseFuturesMap(exchangeInfo, tokenSet) {
   return out;
 }
 
-function alphaUniverse(alphaList, seedTokens, maxTokens) {
+function alphaUniverse(alphaList, seedTokens, maxTokens, allowedBases = null) {
   const rows = [];
   const seen = new Set(seedTokens);
   alphaList.forEach((item) => {
     const snap = alphaSnapshot(item);
     if (!snap || !snap.symbol) return;
     if (!/^[A-Z0-9]{1,15}$/.test(snap.symbol)) return;
+    if (allowedBases && !allowedBases.has(snap.symbol)) return;
     if (seen.has(snap.symbol)) return;
     const score = alphaPreScore(snap);
     if (score < 25) return;
@@ -219,21 +220,31 @@ async function funding(symbol, limit = 24) {
 async function buildUniverse(config) {
   const alphaList = await getAlphaList();
   let exchange = null;
+  let allowedBases = null;
   if (!config.disableFutures) {
     try {
       exchange = await getExchangeInfo();
+      allowedBases = new Set(
+        (exchange.symbols || [])
+          .filter((item) => item.quoteAsset === "USDT" && ["PERPETUAL", "TRADIFI_PERPETUAL"].includes(item.contractType))
+          .map((item) => String(item.baseAsset || "").toUpperCase())
+          .filter(Boolean),
+      );
     } catch (error) {
-      console.warn(`Futures exchangeInfo unavailable, continuing alpha-only: ${error.message}`);
+      console.warn(`Futures exchangeInfo unavailable: ${error.message}`);
     }
   }
   const seed = new Set([...config.pumpedTokens, ...config.seedCandidates, ...config.extraTokens].map((x) => x.toUpperCase()));
   if (config.scanAlphaUniverse) {
-    alphaUniverse(alphaList, seed, config.maxScanTokens).forEach((token) => seed.add(token));
+    alphaUniverse(alphaList, seed, config.maxScanTokens * 2, allowedBases).forEach((token) => seed.add(token));
   }
   const alphaMap = chooseAlphaMap(alphaList, seed);
   const futuresMap = exchange ? chooseFuturesMap(exchange, seed) : new Map();
+  const tokens = Array.from(seed)
+    .filter((token) => futuresMap.has(token))
+    .slice(0, config.maxScanTokens);
   return {
-    tokens: Array.from(seed).slice(0, config.maxScanTokens),
+    tokens,
     alphaMap,
     futuresMap,
     serverTime: n(exchange && exchange.serverTime, Date.now()),
@@ -245,7 +256,7 @@ async function fetchTokenMarket(token, futuresInfo) {
   const symbol = futuresInfo.symbol;
   const [k15, k1h, oi, topPos, taker, fundingRows] = await Promise.all([
     futuresKlines(symbol, "15m", 96).catch(() => []),
-    futuresKlines(symbol, "1h", 168).catch(() => []),
+    futuresKlines(symbol, "1h", 720).catch(() => []),
     futuresData(symbol, "openInterestHist", "15m", 96),
     futuresData(symbol, "topLongShortPositionRatio", "15m", 96),
     futuresData(symbol, "takerlongshortRatio", "15m", 96),

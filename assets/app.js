@@ -47,6 +47,7 @@ function rows() {
   if (!state.data) return [];
   const query = state.query.trim().toUpperCase();
   return state.data.records
+    .filter((item) => item.futures && item.futures.symbol)
     .filter((item) => {
       if (state.filter === "signal") return item.signal;
       if (state.filter === "candidate") return item.cohort !== "pumped";
@@ -182,12 +183,22 @@ function chooseAlphaMap(alphaList, tokens) {
   return out;
 }
 
-function alphaUniverse(alphaList, seeds, maxTokens) {
+function futuresBases(exchangeInfo) {
+  return new Set(
+    (exchangeInfo.symbols || [])
+      .filter((item) => item.quoteAsset === "USDT" && ["PERPETUAL", "TRADIFI_PERPETUAL"].includes(item.contractType))
+      .map((item) => String(item.baseAsset || "").toUpperCase())
+      .filter(Boolean),
+  );
+}
+
+function alphaUniverse(alphaList, seeds, maxTokens, allowedBases) {
   const seen = new Set(seeds);
   const rows = [];
   alphaList.forEach((item) => {
     const snap = alphaSnapshot(item);
     if (!/^[A-Z0-9]{1,15}$/.test(snap.symbol)) return;
+    if (allowedBases && !allowedBases.has(snap.symbol)) return;
     if (seen.has(snap.symbol)) return;
     const score = alphaPreScore(snap);
     if (score < 25) return;
@@ -318,9 +329,11 @@ async function browserScan() {
   ]);
   const alphaList = alphaPayload.data || [];
   const seeds = [...SEED_PUMPED, ...SEED_CANDIDATES];
-  const tokens = [...seeds, ...alphaUniverse(alphaList, seeds, 90)].slice(0, 90);
-  const alphaMap = chooseAlphaMap(alphaList, tokens);
-  const futuresMap = chooseFuturesMap(exchangeInfo, tokens);
+  const allowedBases = futuresBases(exchangeInfo);
+  const rawTokens = [...seeds, ...alphaUniverse(alphaList, seeds, 180, allowedBases)];
+  const alphaMap = chooseAlphaMap(alphaList, rawTokens);
+  const futuresMap = chooseFuturesMap(exchangeInfo, rawTokens);
+  const tokens = rawTokens.filter((token) => futuresMap.has(token)).slice(0, 90);
 
   const records = await mapLimit(tokens, 6, async (token) => {
     const alpha = alphaMap.get(token) || null;
@@ -370,35 +383,37 @@ async function browserScan() {
     };
   });
 
-  records.sort((a, b) => b.score - a.score);
-  const candidates = records.filter((record) => record.cohort !== "pumped");
+  const perpRecords = records.filter((record) => record && record.futures && record.futures.symbol).sort((a, b) => b.score - a.score);
+  const candidates = perpRecords.filter((record) => record.cohort !== "pumped");
   return {
     generatedAt: new Date().toISOString(),
     scanMode: { scanAlphaUniverse: true, browserDirect: true },
     coverage: {
-      total: records.length,
-      withFutures: records.filter((record) => record.futures).length,
-      withAlpha: records.filter((record) => record.alpha).length,
+      total: perpRecords.length,
+      withFutures: perpRecords.length,
+      withAlpha: perpRecords.filter((record) => record.alpha).length,
     },
     seed: { pumped: SEED_PUMPED, candidates: SEED_CANDIDATES, extra: [] },
     summary: {
-      total: records.length,
-      signals: records.filter((record) => record.signal).length,
+      total: perpRecords.length,
+      signals: perpRecords.filter((record) => record.signal).length,
       candidateSignals: candidates.filter((record) => record.signal).length,
       highRisk: candidates.filter((record) => record.score >= 70).length,
       top: candidates.slice().sort((a, b) => b.score - a.score).slice(0, 10),
     },
-    records,
+    records: perpRecords,
   };
 }
 
 function renderStats() {
   const data = state.data;
-  $("signals").textContent = data.summary.signals;
-  $("highRisk").textContent = data.summary.highRisk;
-  $("coverage").textContent = `${data.coverage.withFutures}/${data.coverage.total}`;
+  const perps = data.records.filter((record) => record.futures && record.futures.symbol);
+  const candidates = perps.filter((record) => record.cohort !== "pumped");
+  $("signals").textContent = perps.filter((record) => record.signal).length;
+  $("highRisk").textContent = candidates.filter((record) => record.score >= 70).length;
+  $("coverage").textContent = `${perps.length} perps`;
   $("lastScan").textContent = new Date(data.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  $("modePill").textContent = data.scanMode.scanAlphaUniverse ? "alpha universe" : "seed list";
+  $("modePill").textContent = data.scanMode.scanAlphaUniverse ? "perp alpha universe" : "perp seed list";
 }
 
 function renderTable() {
@@ -408,12 +423,12 @@ function renderTable() {
   }
   $("rowCount").textContent = `${visible.length} tokens`;
   $("rows").innerHTML = visible
-    .map((item) => {
+    .map((item, index) => {
       const f = item.futures || {};
       const a = item.alpha || {};
       const cls = scoreClass(item.score);
       return `<tr data-token="${item.token}" class="${item.token === state.selected ? "selected" : ""} ${item.signal ? "signal-row" : ""}">
-        <td><div class="token"><strong>${item.token}</strong><span>${f.symbol || "no perp"} · ${a.alphaId || "no alpha"}</span></div></td>
+        <td><div class="token"><strong>${item.token}</strong><span>${f.symbol} - ${a.alphaId || "no alpha"}</span></div></td>
         <td><div class="score-cell"><strong>${item.score}</strong><span class="track"><span class="fill ${cls}" style="width:${item.score}%"></span></span></div></td>
         <td class="${trend(f.ret4h)}">${pct(f.ret4h)}</td>
         <td class="${trend(f.ret24h)}">${pct(f.ret24h)}</td>
@@ -429,6 +444,35 @@ function renderTable() {
     tr.addEventListener("click", () => {
       state.selected = tr.dataset.token;
       renderTable();
+      renderRank();
+      renderDetail();
+    });
+  });
+}
+
+function renderRank() {
+  const candidates = (state.data?.records || [])
+    .filter((record) => record.cohort !== "pumped" && record.futures && record.futures.symbol)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 12);
+  $("rankList").innerHTML = candidates
+    .map((item) => {
+      const reason = (item.reasons || []).slice(0, 2).join(" - ");
+      return `<li data-token="${item.token}" class="${item.token === state.selected ? "selected" : ""}">
+        <div class="rank-line">
+          <strong>${item.token}</strong>
+          <span class="score ${scoreClass(item.score)}">${item.score}</span>
+        </div>
+        <p>${item.futures.symbol}${reason ? ` - ${reason}` : ""}</p>
+      </li>`;
+    })
+    .join("");
+
+  document.querySelectorAll("#rankList li").forEach((li) => {
+    li.addEventListener("click", () => {
+      state.selected = li.dataset.token;
+      renderTable();
+      renderRank();
       renderDetail();
     });
   });
@@ -451,7 +495,26 @@ function renderDetail() {
   $("reasons").innerHTML = (item.reasons.length ? item.reasons : ["no active trigger"])
     .map((reason) => `<span class="chip">${reason}</span>`)
     .join("");
-  drawChart(item.chart || []);
+  drawChart(item.chartFull || item.chart || []);
+  loadChartHistory(item);
+}
+
+async function loadChartHistory(item) {
+  const symbol = item.futures && item.futures.symbol;
+  if (!symbol || item.chartFull || item.chartLoading) return;
+  item.chartLoading = true;
+  try {
+    const rows = await getJson(`${FUTURES_BASE}/fapi/v1/klines?${q({ symbol, interval: "1h", limit: 1500 })}`);
+    const full = rows.map(parseKline).map((candle) => ({ t: candle.t, c: candle.c, h: candle.h, l: candle.l, qv: candle.qv }));
+    if (full.length > 1) {
+      item.chartFull = full;
+      if (state.selected === item.token) drawChart(full);
+    }
+  } catch {
+    item.chartFull = item.chart || [];
+  } finally {
+    item.chartLoading = false;
+  }
 }
 
 function drawChart(points) {
@@ -522,12 +585,15 @@ function drawChart(points) {
   ctx.font = "12px Inter, sans-serif";
   ctx.fillText(`high ${maxP.toPrecision(4)}`, 8, pad.t + 8);
   ctx.fillText(`low ${minP.toPrecision(4)}`, 8, pad.t + innerH * 0.72);
+  ctx.fillText(new Date(points[0].t).toISOString().slice(0, 10), pad.l, h - 14);
+  ctx.fillText(new Date(points[points.length - 1].t).toISOString().slice(0, 10), Math.max(pad.l, w - 104), h - 14);
 }
 
 function render() {
   if (!state.data) return;
   renderStats();
   renderTable();
+  renderRank();
   renderDetail();
 }
 
