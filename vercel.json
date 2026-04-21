@@ -1,9 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "crons": [
-    {
-      "path": "/api/cron",
-      "schedule": "*/5 * * * *"
+  "regions": ["fra1"],
+  "functions": {
+    "api/*.js": {
+      "regions": ["fra1"],
+      "maxDuration": 300
     }
-  ]
+  }
 }

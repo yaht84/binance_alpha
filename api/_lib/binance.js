@@ -217,18 +217,26 @@ async function funding(symbol, limit = 24) {
 }
 
 async function buildUniverse(config) {
-  const [exchange, alphaList] = await Promise.all([getExchangeInfo(), getAlphaList()]);
+  const alphaList = await getAlphaList();
+  let exchange = null;
+  if (!config.disableFutures) {
+    try {
+      exchange = await getExchangeInfo();
+    } catch (error) {
+      console.warn(`Futures exchangeInfo unavailable, continuing alpha-only: ${error.message}`);
+    }
+  }
   const seed = new Set([...config.pumpedTokens, ...config.seedCandidates, ...config.extraTokens].map((x) => x.toUpperCase()));
   if (config.scanAlphaUniverse) {
     alphaUniverse(alphaList, seed, config.maxScanTokens).forEach((token) => seed.add(token));
   }
   const alphaMap = chooseAlphaMap(alphaList, seed);
-  const futuresMap = chooseFuturesMap(exchange, seed);
+  const futuresMap = exchange ? chooseFuturesMap(exchange, seed) : new Map();
   return {
     tokens: Array.from(seed).slice(0, config.maxScanTokens),
     alphaMap,
     futuresMap,
-    serverTime: n(exchange.serverTime, Date.now()),
+    serverTime: n(exchange && exchange.serverTime, Date.now()),
   };
 }
 

@@ -11,7 +11,7 @@ Live dashboard and Telegram alert worker for Binance Alpha + USDT-M perpetual si
 ## Deploy on Vercel
 
 1. Push this `live-radar` folder to GitHub.
-2. Create a Vercel project and set the project root directory to `live-radar`.
+2. Import `yaht84/binance_alpha` in Vercel.
 3. Add environment variables:
 
 | Name | Required | Example |
@@ -21,14 +21,37 @@ Live dashboard and Telegram alert worker for Binance Alpha + USDT-M perpetual si
 | `CRON_SECRET` | recommended | random 32+ char string |
 | `PUBLIC_BASE_URL` | recommended | `your-project.vercel.app` |
 | `SCAN_ALPHA_UNIVERSE` | optional | `true` |
+| `DISABLE_FUTURES` | optional | `false` |
 | `MAX_SCAN_TOKENS` | optional | `90` |
 | `ALERT_SCORE_THRESHOLD` | optional | `75` |
+| `ALERT_RESET_THRESHOLD` | optional | `60` |
+| `ALERT_ESCALATION_DELTA` | optional | `12` |
+| `ALERT_REMINDER_HOURS` | optional | `0` |
 | `ALERT_COOLDOWN_SECONDS` | optional | `21600` |
 | `EXTRA_TOKENS` | optional | `TOKEN1,TOKEN2` |
-| `UPSTASH_REDIS_REST_URL` | recommended | Upstash REST URL |
-| `UPSTASH_REDIS_REST_TOKEN` | recommended | Upstash REST token |
+| `UPSTASH_REDIS_REST_URL` | required for alerts | Upstash REST URL |
+| `UPSTASH_REDIS_REST_TOKEN` | required for alerts | Upstash REST token |
 
-4. Deploy. Vercel cron calls `/api/cron` every 5 minutes.
+4. Deploy. The project is pinned to Vercel region `fra1` in `vercel.json`.
+
+Important for free Vercel Hobby:
+
+- Vercel Cron on Hobby is limited to once per day, so this repo does not register a 5-minute Vercel cron by default.
+- The live dashboard still works because it calls `/api/live` from the browser.
+- For Telegram alert checks every 5 minutes, use an external free scheduler such as cron-job.org to call:
+
+```text
+https://YOUR-PROJECT.vercel.app/api/cron?secret=YOUR_CRON_SECRET
+```
+
+Set `CRON_SECRET` in Vercel first. Alert delivery is stateful: `/api/cron` only sends a message when a candidate enters a trigger, escalates by `ALERT_ESCALATION_DELTA`, or optional reminders are enabled. It will not send the same active signal every 5 minutes.
+
+Upstash Redis is required for Telegram alerts on Vercel. Without it, `/api/cron` refuses to send alerts because Vercel serverless memory is not durable enough to prevent spam.
+
+After deploy, check:
+
+- `/api/health` should show `regionHint: "fra1"` and `withFutures > 0`.
+- `/api/live` should return the full scan JSON.
 
 ## Telegram setup
 
@@ -46,39 +69,6 @@ npm run check
 ```
 
 The dashboard auto-refreshes `/api/live` every 60 seconds. The alert worker only sends candidate signals; the historical pump cohort is kept for context.
-
-## Free deploy with GitHub Pages + Actions
-
-If Render asks for a paid plan, use the free static mode. It does not need an always-on backend.
-
-How it works:
-
-- GitHub Actions runs every 5 minutes.
-- The workflow fetches Binance data and writes `public/data/live.json`.
-- GitHub Pages serves the dashboard.
-- The dashboard reads `data/live.json`.
-- Telegram alerts are sent from the workflow.
-
-Files:
-
-- `.github/workflows/live-radar.yml`
-- `scripts/build-static.js`
-- `assets/app.js` with fallback from `api/live` to `data/live.json`
-
-Setup:
-
-1. In GitHub repo settings, open **Pages** and set source to **GitHub Actions** if GitHub asks.
-2. Add repo secrets:
-   - `TELEGRAM_BOT_TOKEN`
-   - `TELEGRAM_CHAT_ID`
-3. Add repo variables:
-   - `PUBLIC_BASE_URL`: usually `https://yaht84.github.io/binance_alpha/`
-   - `SCAN_ALPHA_UNIVERSE`: `true`
-   - `MAX_SCAN_TOKENS`: `90`
-   - `ALERT_SCORE_THRESHOLD`: `75`
-   - `ALERT_COOLDOWN_SECONDS`: `21600`
-
-You can also run the workflow manually from the **Actions** tab.
 
 ## Deploy on Render
 

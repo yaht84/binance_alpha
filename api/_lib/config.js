@@ -25,8 +25,12 @@ function getConfig() {
     seedCandidates: SEED_CANDIDATES,
     extraTokens: splitEnvList(process.env.EXTRA_TOKENS),
     scanAlphaUniverse: boolEnv("SCAN_ALPHA_UNIVERSE", true),
+    disableFutures: boolEnv("DISABLE_FUTURES", false),
     maxScanTokens: intEnv("MAX_SCAN_TOKENS", 90),
     alertScoreThreshold: intEnv("ALERT_SCORE_THRESHOLD", 75),
+    alertResetThreshold: intEnv("ALERT_RESET_THRESHOLD", 60),
+    alertEscalationDelta: intEnv("ALERT_ESCALATION_DELTA", 12),
+    alertReminderHours: intEnv("ALERT_REMINDER_HOURS", 0),
     alertCooldownSeconds: intEnv("ALERT_COOLDOWN_SECONDS", 6 * 60 * 60),
     publicBaseUrl: process.env.PUBLIC_BASE_URL || process.env.VERCEL_URL || "",
   };

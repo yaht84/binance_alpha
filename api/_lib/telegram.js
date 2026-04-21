@@ -20,12 +20,18 @@ function pct(value) {
   return `${number > 0 ? "+" : ""}${number.toFixed(Math.abs(number) >= 100 ? 0 : 1)}%`;
 }
 
-function formatAlert(item, publicBaseUrl) {
+function formatAlert(item, publicBaseUrl, action = "enter") {
   const alpha = item.alpha || {};
   const futures = item.futures || {};
   const link = publicBaseUrl ? `https://${String(publicBaseUrl).replace(/^https?:\/\//, "")}` : "";
+  const label =
+    action === "escalation"
+      ? "PND escalation"
+      : action === "reminder"
+        ? "PND still active"
+        : "PND trigger";
   const lines = [
-    `<b>Binance Alpha PND signal: ${htmlEscape(item.token)}</b>`,
+    `<b>Binance Alpha ${label}: ${htmlEscape(item.token)}</b>`,
     `Score: <b>${item.score}/100</b>`,
     futures.symbol ? `Perp: <code>${htmlEscape(futures.symbol)}</code> price ${futures.price}` : "Perp: no live futures data",
     `24h: ${pct(futures.ret24h)} | 4h: ${pct(futures.ret4h)} | OI: ${pct(futures.oi && futures.oi.changePct)}`,

@@ -18,6 +18,10 @@ async function redisCommand(command) {
   return payload[0] && payload[0].result;
 }
 
+function hasDurableStore() {
+  return redisReady();
+}
+
 async function seen(key) {
   if (redisReady()) {
     const value = await redisCommand(["GET", key]);
@@ -39,7 +43,39 @@ async function markSeen(key, ttlSeconds) {
   localMemory.set(key, Date.now() + ttlSeconds * 1000);
 }
 
+async function getJson(key) {
+  if (redisReady()) {
+    const value = await redisCommand(["GET", key]);
+    if (!value) return null;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  const record = localMemory.get(key);
+  if (!record || record.expiresAt < Date.now()) {
+    localMemory.delete(key);
+    return null;
+  }
+  return record.value;
+}
+
+async function setJson(key, value, ttlSeconds = 30 * 24 * 60 * 60) {
+  if (redisReady()) {
+    await redisCommand(["SET", key, JSON.stringify(value), "EX", ttlSeconds]);
+    return;
+  }
+  localMemory.set(key, {
+    value,
+    expiresAt: Date.now() + ttlSeconds * 1000,
+  });
+}
+
 module.exports = {
+  hasDurableStore,
   seen,
   markSeen,
+  getJson,
+  setJson,
 };
