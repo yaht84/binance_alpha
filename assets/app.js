@@ -66,13 +66,12 @@ async function loadLive() {
   $("statusText").textContent = "refreshing";
   $("liveDot").className = "";
   try {
-    const response = await fetch(`/api/live?ts=${Date.now()}`);
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-    state.data = await response.json();
+    const loaded = await fetchData();
+    state.data = loaded.data;
     if (!state.selected && state.data.records.length) {
       state.selected = state.data.summary.top[0]?.token || state.data.records[0].token;
     }
-    $("statusText").textContent = "live";
+    $("statusText").textContent = loaded.source;
     $("liveDot").className = "ok";
     render();
   } catch (error) {
@@ -81,6 +80,25 @@ async function loadLive() {
   } finally {
     state.busy = false;
   }
+}
+
+async function fetchData() {
+  const ts = Date.now();
+  const endpoints = [
+    { url: `api/live?ts=${ts}`, source: "live api" },
+    { url: `data/live.json?ts=${ts}`, source: "static live" },
+  ];
+  let lastError;
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint.url, { cache: "no-store" });
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+      return { data: await response.json(), source: endpoint.source };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("no data endpoint available");
 }
 
 function renderStats() {

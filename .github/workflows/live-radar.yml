@@ -1,0 +1,76 @@
+name: Live radar
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Restore alert state
+        uses: actions/cache/restore@v4
+        with:
+          path: .alert-state.json
+          key: alert-state-${{ github.run_id }}
+          restore-keys: |
+            alert-state-
+
+      - name: Build static radar
+        run: npm run build:static
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
+          SCAN_ALPHA_UNIVERSE: ${{ vars.SCAN_ALPHA_UNIVERSE || 'true' }}
+          MAX_SCAN_TOKENS: ${{ vars.MAX_SCAN_TOKENS || '90' }}
+          ALERT_SCORE_THRESHOLD: ${{ vars.ALERT_SCORE_THRESHOLD || '75' }}
+          ALERT_COOLDOWN_SECONDS: ${{ vars.ALERT_COOLDOWN_SECONDS || '21600' }}
+          EXTRA_TOKENS: ${{ vars.EXTRA_TOKENS }}
+
+      - name: Save alert state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .alert-state.json
+          key: alert-state-${{ github.run_id }}
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

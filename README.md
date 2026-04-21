@@ -47,6 +47,39 @@ npm run check
 
 The dashboard auto-refreshes `/api/live` every 60 seconds. The alert worker only sends candidate signals; the historical pump cohort is kept for context.
 
+## Free deploy with GitHub Pages + Actions
+
+If Render asks for a paid plan, use the free static mode. It does not need an always-on backend.
+
+How it works:
+
+- GitHub Actions runs every 5 minutes.
+- The workflow fetches Binance data and writes `public/data/live.json`.
+- GitHub Pages serves the dashboard.
+- The dashboard reads `data/live.json`.
+- Telegram alerts are sent from the workflow.
+
+Files:
+
+- `.github/workflows/live-radar.yml`
+- `scripts/build-static.js`
+- `assets/app.js` with fallback from `api/live` to `data/live.json`
+
+Setup:
+
+1. In GitHub repo settings, open **Pages** and set source to **GitHub Actions** if GitHub asks.
+2. Add repo secrets:
+   - `TELEGRAM_BOT_TOKEN`
+   - `TELEGRAM_CHAT_ID`
+3. Add repo variables:
+   - `PUBLIC_BASE_URL`: usually `https://yaht84.github.io/binance_alpha/`
+   - `SCAN_ALPHA_UNIVERSE`: `true`
+   - `MAX_SCAN_TOKENS`: `90`
+   - `ALERT_SCORE_THRESHOLD`: `75`
+   - `ALERT_COOLDOWN_SECONDS`: `21600`
+
+You can also run the workflow manually from the **Actions** tab.
+
 ## Deploy on Render
 
 This repo also includes `server.js`, `render.yaml`, and `npm start` so it can run as a Render Node web service.

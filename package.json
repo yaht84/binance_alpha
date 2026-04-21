@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node server.js",
     "cron": "node scripts/cron-once.js",
-    "check": "node --check server.js && node --check scripts/cron-once.js && node --check api/live.js && node --check api/cron.js && node --check api/_lib/binance.js && node --check api/_lib/signals.js && node --check api/_lib/telegram.js && node --check api/_lib/store.js && node --check assets/app.js"
+    "build:static": "node scripts/build-static.js",
+    "check": "node --check server.js && node --check scripts/cron-once.js && node --check scripts/build-static.js && node --check api/live.js && node --check api/cron.js && node --check api/_lib/binance.js && node --check api/_lib/signals.js && node --check api/_lib/telegram.js && node --check api/_lib/store.js && node --check assets/app.js"
   },
   "engines": {
     "node": ">=20"
