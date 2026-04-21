@@ -1,0 +1,62 @@
+services:
+  - type: web
+    name: binance-alpha-pnd-radar
+    runtime: node
+    region: frankfurt
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: SCAN_ALPHA_UNIVERSE
+        value: "true"
+      - key: MAX_SCAN_TOKENS
+        value: "90"
+      - key: ALERT_SCORE_THRESHOLD
+        value: "75"
+      - key: ALERT_COOLDOWN_SECONDS
+        value: "21600"
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: CRON_SECRET
+        generateValue: true
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+
+  - type: cron
+    name: binance-alpha-pnd-alerts
+    runtime: node
+    region: frankfurt
+    plan: starter
+    schedule: "*/5 * * * *"
+    buildCommand: npm install
+    startCommand: npm run cron
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: SCAN_ALPHA_UNIVERSE
+        value: "true"
+      - key: MAX_SCAN_TOKENS
+        value: "90"
+      - key: ALERT_SCORE_THRESHOLD
+        value: "75"
+      - key: ALERT_COOLDOWN_SECONDS
+        value: "21600"
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false

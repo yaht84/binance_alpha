@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Binance Alpha Live Radar</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Live Binance Alpha + perps</p>
+          <h1>PND Signal Radar</h1>
+        </div>
+        <div class="live-strip">
+          <span id="liveDot"></span>
+          <strong id="statusText">connecting</strong>
+          <button id="refreshButton" title="Refresh now" aria-label="Refresh now">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M17.7 6.3A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.8-4.3L13 11h8V3l-3.3 3.3Z" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <section class="stats">
+        <article>
+          <span>Signals</span>
+          <strong id="signals">-</strong>
+        </article>
+        <article>
+          <span>High-risk candidates</span>
+          <strong id="highRisk">-</strong>
+        </article>
+        <article>
+          <span>Coverage</span>
+          <strong id="coverage">-</strong>
+        </article>
+        <article>
+          <span>Last scan</span>
+          <strong id="lastScan">-</strong>
+        </article>
+      </section>
+
+      <section class="controls">
+        <label class="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M10.8 4.5a6.3 6.3 0 1 1 0 12.6 6.3 6.3 0 0 1 0-12.6Zm0 2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6Zm5.2 8.4 3.7 3.7-1.4 1.4-3.7-3.7 1.4-1.4Z" />
+          </svg>
+          <input id="search" type="search" placeholder="Token" />
+        </label>
+        <div class="segmented" role="group" aria-label="Filter">
+          <button class="active" data-filter="all">All</button>
+          <button data-filter="signal">Signals</button>
+          <button data-filter="candidate">Candidates</button>
+          <button data-filter="pumped">Pump cohort</button>
+        </div>
+      </section>
+
+      <section class="grid">
+        <div class="list-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Market scan</p>
+              <h2 id="rowCount">Tokens</h2>
+            </div>
+            <span id="modePill">alpha universe</span>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Token</th>
+                  <th>Score</th>
+                  <th>4h</th>
+                  <th>24h</th>
+                  <th>Vol 1h x</th>
+                  <th>OI</th>
+                  <th>Alpha vol/liq</th>
+                  <th>Liq</th>
+                </tr>
+              </thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <aside class="detail-panel">
+          <div class="panel-head tight">
+            <div>
+              <p class="eyebrow" id="detailMeta">selected</p>
+              <h2 id="detailTitle">-</h2>
+            </div>
+            <span id="detailScore" class="score">-</span>
+          </div>
+          <canvas id="chart" width="720" height="340"></canvas>
+          <div class="detail-grid">
+            <div><span>Perp</span><strong id="perp">-</strong></div>
+            <div><span>Price</span><strong id="price">-</strong></div>
+            <div><span>Market cap</span><strong id="mcap">-</strong></div>
+            <div><span>Liquidity</span><strong id="liq">-</strong></div>
+          </div>
+          <div id="reasons" class="reasons"></div>
+        </aside>
+      </section>
+    </main>
+    <script src="/assets/app.js"></script>
+  </body>
+</html>
