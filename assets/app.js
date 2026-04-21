@@ -4,6 +4,7 @@ const state = {
   query: "",
   selected: null,
   busy: false,
+  chartRange: "full",
 };
 
 const $ = (id) => document.getElementById(id);
@@ -589,6 +590,33 @@ function renderRank() {
   });
 }
 
+function chartPointsFor(item) {
+  const source = item.chartFull || item.chart || [];
+  if (!source.length || state.chartRange === "full") return source;
+  const days = n(state.chartRange);
+  if (!days) return source;
+  const lastTime = n(source[source.length - 1].t, Date.now());
+  const since = lastTime - days * 86_400_000;
+  const clipped = source.filter((point) => n(point.t) >= since);
+  return clipped.length > 1 ? clipped : source.slice(-Math.min(source.length, 48));
+}
+
+function updateChartMeta(item, points) {
+  if (!item) return;
+  const base = item.chartFull ? item.chartLabel : "30d preview - loading full history";
+  if (state.chartRange === "full") {
+    $("chartMeta").textContent = base;
+    return;
+  }
+  $("chartMeta").textContent = `last ${state.chartRange}d - ${points.length} candles (${base})`;
+}
+
+function updateChartRangeButtons() {
+  document.querySelectorAll("[data-chart-range]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.chartRange === state.chartRange);
+  });
+}
+
 function renderDetail() {
   if (!state.data || !state.selected) return;
   const item = state.data.records.find((record) => record.token === state.selected);
@@ -607,11 +635,13 @@ function renderDetail() {
   $("maxPump").textContent = pct(f.pumpPct);
   $("maxDump").textContent = pct(f.dumpPct);
   $("pattern").textContent = f.pattern || item.cohort;
-  $("chartMeta").textContent = item.chartLabel || "30d preview - loading full history";
   $("reasons").innerHTML = (item.reasons.length ? item.reasons : ["no active trigger"])
     .map((reason) => `<span class="chip">${reason}</span>`)
     .join("");
-  drawChart(item.chartFull || item.chart || []);
+  updateChartRangeButtons();
+  const points = chartPointsFor(item);
+  updateChartMeta(item, points);
+  drawChart(points);
   loadChartHistory(item);
 }
 
@@ -637,8 +667,9 @@ async function loadChartHistory(item) {
       if (state.selected === item.token) {
         $("maxPump").textContent = pct(pumpDump.pumpPct);
         $("maxDump").textContent = pct(pumpDump.dumpPct);
-        $("chartMeta").textContent = item.chartLabel;
-        drawChart(full);
+        const points = chartPointsFor(item);
+        updateChartMeta(item, points);
+        drawChart(points);
       }
     }
   } catch {
@@ -741,6 +772,13 @@ function bind() {
       document.querySelectorAll(".segmented button").forEach((b) => b.classList.remove("active"));
       button.classList.add("active");
       renderTable();
+      renderDetail();
+    });
+  });
+  document.querySelectorAll("[data-chart-range]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.chartRange = button.dataset.chartRange;
+      updateChartRangeButtons();
       renderDetail();
     });
   });

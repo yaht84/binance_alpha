@@ -4,14 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Binance Alpha Live Radar</title>
-    <link rel="stylesheet" href="assets/styles.css?v=20260421e" />
+    <link rel="stylesheet" href="assets/styles.css?v=20260421f" />
   </head>
   <body>
     <main class="shell">
       <header class="topbar">
         <div class="brand-block">
           <div class="brandline">
-            <img class="brand-logo" src="assets/binance-logo.svg?v=20260421d" alt="Binance" />
+            <img class="brand-logo" src="assets/logo.png?v=20260421f" alt="Binance" />
             <span>Alpha Perp Radar</span>
           </div>
           <p class="eyebrow">Live Binance Alpha + USDT-M perps</p>
@@ -112,6 +112,12 @@
             </div>
             <span id="detailScore" class="score">-</span>
           </div>
+          <div class="chart-toolbar" role="group" aria-label="Chart range">
+            <button data-chart-range="7">7D</button>
+            <button data-chart-range="30">30D</button>
+            <button data-chart-range="90">90D</button>
+            <button class="active" data-chart-range="full">Full</button>
+          </div>
           <canvas id="chart" width="720" height="340"></canvas>
           <small id="chartMeta" class="chart-meta">30d preview</small>
           <div class="detail-grid">
@@ -140,6 +146,6 @@
         </div>
       </section>
     </main>
-    <script src="assets/app.js?v=20260421e"></script>
+    <script src="assets/app.js?v=20260421f"></script>
   </body>
 </html>
