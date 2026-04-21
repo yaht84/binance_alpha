@@ -212,6 +212,7 @@ function analyzeToken(record) {
     live.futures = {
       symbol: futures.symbol,
       contractType: futures.contractType,
+      onboardDate: futures.onboardDate,
       price: last.c,
       ret1h,
       ret4h,

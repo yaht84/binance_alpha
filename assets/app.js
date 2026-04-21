@@ -293,6 +293,17 @@ function pumpDumpMetric(candles) {
   return { pumpPct, dumpPct };
 }
 
+function chartIntervalFor(item) {
+  const onboardDate = n(item.futures && item.futures.onboardDate);
+  if (!onboardDate) return { interval: "1d", startTime: null, label: "1d max-history preview" };
+  const ageDays = Math.max(1, (Date.now() - onboardDate) / 86_400_000);
+  if (ageDays <= 70) return { interval: "1h", startTime: onboardDate, label: "full history - 1h candles" };
+  if (ageDays <= 250) return { interval: "4h", startTime: onboardDate, label: "full history - 4h candles" };
+  if (ageDays <= 750) return { interval: "12h", startTime: onboardDate, label: "full history - 12h candles" };
+  if (ageDays <= 1500) return { interval: "1d", startTime: onboardDate, label: "full history - 1d candles" };
+  return { interval: "1w", startTime: onboardDate, label: "full history - 1w candles" };
+}
+
 function scoreRecord(alpha, futures) {
   const reasons = [];
   let score = 0;
@@ -376,6 +387,7 @@ async function browserScan() {
         futures = {
           symbol: info.symbol,
           contractType: info.contractType,
+          onboardDate: n(info.onboardDate),
           price: last.c,
           ret4h,
           ret24h,
@@ -518,6 +530,7 @@ function renderDetail() {
   $("oi30d").textContent = pct((f.oi30d || f.oi) && (f.oi30d || f.oi).changePct);
   $("maxPump").textContent = pct(f.pumpPct);
   $("maxDump").textContent = pct(f.dumpPct);
+  $("chartMeta").textContent = item.chartLabel || "30d preview - loading full history";
   $("reasons").innerHTML = (item.reasons.length ? item.reasons : ["no active trigger"])
     .map((reason) => `<span class="chip">${reason}</span>`)
     .join("");
@@ -530,16 +543,24 @@ async function loadChartHistory(item) {
   if (!symbol || item.chartFull || item.chartLoading) return;
   item.chartLoading = true;
   try {
-    const rows = await getJson(`${FUTURES_BASE}/fapi/v1/klines?${q({ symbol, interval: "1h", limit: 1500 })}`);
+    const range = chartIntervalFor(item);
+    const params = { symbol, interval: range.interval, limit: 1500 };
+    if (range.startTime) params.startTime = range.startTime;
+    let rows = await getJson(`${FUTURES_BASE}/fapi/v1/klines?${q(params)}`);
+    if (!Array.isArray(rows) || rows.length < 2) {
+      rows = await getJson(`${FUTURES_BASE}/fapi/v1/klines?${q({ symbol, interval: range.interval, limit: 1500 })}`);
+    }
     const full = rows.map(parseKline).map((candle) => ({ t: candle.t, c: candle.c, h: candle.h, l: candle.l, qv: candle.qv }));
     if (full.length > 1) {
       item.chartFull = full;
+      item.chartLabel = `${range.label} - ${full.length} candles`;
       const pumpDump = pumpDumpMetric(full);
       item.futures.pumpPct = pumpDump.pumpPct;
       item.futures.dumpPct = pumpDump.dumpPct;
       if (state.selected === item.token) {
         $("maxPump").textContent = pct(pumpDump.pumpPct);
         $("maxDump").textContent = pct(pumpDump.dumpPct);
+        $("chartMeta").textContent = item.chartLabel;
         drawChart(full);
       }
     }

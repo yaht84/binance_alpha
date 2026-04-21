@@ -255,10 +255,21 @@ h2 {
 }
 
 .legend-panel {
-  margin-bottom: 12px;
+  width: fit-content;
+  max-width: 100%;
+  margin: -4px 0 12px auto;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
+}
+
+.legend-panel summary {
+  min-height: 32px;
+  padding: 7px 12px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .legend-panel dl {
@@ -266,11 +277,13 @@ h2 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
   margin: 0;
+  width: min(820px, calc(100vw - 32px));
+  border-top: 1px solid var(--line);
 }
 
 .legend-panel div {
-  min-height: 74px;
-  padding: 12px 14px;
+  min-height: 58px;
+  padding: 9px 11px;
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
@@ -280,16 +293,16 @@ h2 {
 }
 
 .legend-panel dt {
-  margin-bottom: 5px;
+  margin-bottom: 3px;
   color: var(--amber);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 820;
 }
 
 .legend-panel dd {
   margin: 0;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   line-height: 1.35;
 }
 
@@ -465,6 +478,13 @@ tbody tr.selected {
   background: #0f1319;
 }
 
+.chart-meta {
+  display: block;
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
 .detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -511,17 +531,31 @@ tbody tr.selected {
 
 .rank-panel ol {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 0;
   margin: 0;
-  padding: 0 15px 15px 38px;
+  padding: 0 15px 15px;
+  list-style: none;
+  counter-reset: rank-list;
 }
 
 .rank-panel li {
-  min-height: 82px;
-  padding: 10px 12px 10px 0;
+  counter-increment: rank-list;
+  display: grid;
+  grid-template-columns: 38px minmax(90px, 0.22fr) 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 9px 10px;
   border-bottom: 1px solid var(--line);
+  border-radius: 6px;
   cursor: pointer;
+}
+
+.rank-panel li::before {
+  content: counter(rank-list) ".";
+  color: var(--muted);
+  font-weight: 800;
 }
 
 .rank-panel li.selected {
@@ -529,10 +563,14 @@ tbody tr.selected {
 }
 
 .rank-line {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  display: contents;
+}
+
+.rank-line strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rank-line .score {
@@ -542,10 +580,14 @@ tbody tr.selected {
 }
 
 .rank-panel p {
-  margin: 6px 0 0;
+  min-width: 0;
+  margin: 0;
   color: var(--muted);
   font-size: 0.8rem;
   line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 1050px) {
@@ -554,7 +596,7 @@ tbody tr.selected {
   }
 
   .rank-panel ol {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 
   .legend-panel dl {
@@ -603,6 +645,16 @@ tbody tr.selected {
 
   .rank-panel ol {
     grid-template-columns: 1fr;
+  }
+
+  .rank-panel li {
+    grid-template-columns: 30px minmax(0, 1fr) 44px;
+    gap: 8px;
+  }
+
+  .rank-panel p {
+    grid-column: 2 / 4;
+    white-space: normal;
   }
 
   .legend-panel dl {

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Binance Alpha Live Radar</title>
-    <link rel="stylesheet" href="assets/styles.css" />
+    <link rel="stylesheet" href="assets/styles.css?v=20260421c" />
   </head>
   <body>
     <main class="shell">
@@ -59,7 +59,8 @@
         </div>
       </section>
 
-      <section class="legend-panel">
+      <details class="legend-panel">
+        <summary>Metric legend</summary>
         <dl>
           <div><dt>Score</dt><dd>0-100 signal similarity and trigger strength.</dd></div>
           <div><dt>Vol 1h x</dt><dd>Latest perp quote volume vs recent median 1h window.</dd></div>
@@ -68,7 +69,7 @@
           <div><dt>Dump</dt><dd>Largest peak-to-later-low drawdown in loaded history.</dd></div>
           <div><dt>Alpha vol/liq</dt><dd>Binance Alpha 24h volume divided by liquidity.</dd></div>
         </dl>
-      </section>
+      </details>
 
       <section class="grid">
         <div class="list-panel">
@@ -109,6 +110,7 @@
             <span id="detailScore" class="score">-</span>
           </div>
           <canvas id="chart" width="720" height="340"></canvas>
+          <small id="chartMeta" class="chart-meta">30d preview</small>
           <div class="detail-grid">
             <div><span>Perp</span><strong id="perp">-</strong></div>
             <div><span>Price</span><strong id="price">-</strong></div>
@@ -134,6 +136,6 @@
         </div>
       </section>
     </main>
-    <script src="assets/app.js"></script>
+    <script src="assets/app.js?v=20260421c"></script>
   </body>
 </html>
